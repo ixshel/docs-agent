@@ -27,7 +27,7 @@ Use the VS Code Command Palette (`Cmd+Shift+P` on macOS, `Ctrl+Shift+P` on Windo
 Docs Agent:
 
 - collects changed files from Git (staged/unstaged/untracked)
-- filters out non-relevant and test-only changes
+- treats all detected file changes as documentation input
 - performs Java-specific analysis when `.java` files changed
 - decides whether to create/update/skip each managed docs file
 - updates only marker-owned blocks when markers exist
@@ -68,5 +68,5 @@ Set it in `settings.json`:
   - Open a folder that has a `.git` root or initialize one.
 
 - Preview shows no changes:
-  - Confirm you have relevant source/config edits.
-  - Pure docs or test-only changes are intentionally skipped.
+  - Confirm there are actual Git changes in the workspace.
+  - If there are changes and you still see none, verify the folder is a valid Git repo.

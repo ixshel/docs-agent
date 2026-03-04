@@ -1,8 +1,15 @@
 {
   "name": "docs-agent",
+  "publisher": "ixshelescamilla",
   "displayName": "docs-agent",
   "description": "documentation agent",
-  "version": "0.0.1",
+  "icon": "media/icon.png",
+  "version": "0.0.3",
+  "license": "MIT",
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/ixshel"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/ixshel/docs-agent.git"
@@ -49,7 +56,8 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run package",
+    "vscode:prepublish": "npm run bump:patch && npm run package",
+    "bump:patch": "node scripts/bump-version.js",
     "compile": "npm run check-types && npm run lint && node esbuild.js",
     "watch": "npm-run-all -p watch:*",
     "watch:esbuild": "node esbuild.js --watch",

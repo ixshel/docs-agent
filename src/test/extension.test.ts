@@ -37,7 +37,7 @@ test("buildPlan skips when no changed files exist", () => {
   assert.equal(plan.actions[0]?.type, "skip");
 });
 
-test("buildPlan skips for docs-only changes", () => {
+test("buildPlan updates docs even for docs-only changes", () => {
   const plan = buildPlan({
     changedFiles: ["README.md", "docs/10-architecture.md"],
     diff: "mock diff",
@@ -47,9 +47,22 @@ test("buildPlan skips for docs-only changes", () => {
     mode: "rules"
   });
 
-  assert.equal(plan.actions.length, 1);
-  assert.equal(plan.actions[0]?.type, "skip");
-  assert.match(plan.actions[0]?.reason ?? "", /No relevant source\/config changes/i);
+  assert.ok(plan.actions.length >= 3);
+  assert.equal(plan.actions.some(action => action.type === "skip"), false);
+});
+
+test("buildPlan updates docs for test-only file changes", () => {
+  const plan = buildPlan({
+    changedFiles: ["src/test/planner.spec.ts"],
+    diff: "mock diff",
+    project: { buildTool: "maven", isSpringBoot: true },
+    docsExist: { readme: true, docsFolder: true, files: docsMap(MANAGED_DOC_FILES) },
+    javaSignals: baseSignals(),
+    mode: "rules"
+  });
+
+  assert.ok(plan.actions.length >= 3);
+  assert.equal(plan.actions.some(action => action.type === "skip"), false);
 });
 
 test("buildPlan creates docs skeleton when docs folder is missing", () => {
@@ -69,9 +82,9 @@ test("buildPlan creates docs skeleton when docs folder is missing", () => {
   assert.equal(files.includes("README.md"), true);
   assert.equal(files.includes("docs/00-business-overview.md"), true);
   assert.equal(files.includes("docs/10-architecture.md"), true);
-  assert.equal(files.includes("docs/11-api-endpoints.md"), true);
+  assert.equal(files.includes("docs/11-api-endpoints.md"), false);
   assert.equal(files.includes("docs/20-service-behavior.md"), true);
-  assert.equal(files.includes("docs/30-dto-contracts.md"), true);
+  assert.equal(files.includes("docs/30-dto-contracts.md"), false);
   assert.equal(files.includes("docs/01-glossary.md"), true);
 });
 

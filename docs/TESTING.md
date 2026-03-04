@@ -59,7 +59,7 @@ npm run package
 
 Key covered behaviors:
 
-- skip logic for no/restricted changes
+- skip logic only when there are zero changed files
 - docs skeleton planning when docs folder is missing
 - endpoint-driven docs targeting
 - Java endpoint/service/DTO signal extraction

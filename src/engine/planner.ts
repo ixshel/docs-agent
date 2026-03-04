@@ -34,6 +34,12 @@ interface ManagedDocSpec {
   content: string;
 }
 
+interface DiffContext {
+  added: number;
+  removed: number;
+  snippets: string[];
+}
+
 export const MANAGED_DOC_FILES: string[] = [
   "docs/00-business-overview.md",
   "docs/01-glossary.md",
@@ -42,46 +48,6 @@ export const MANAGED_DOC_FILES: string[] = [
   "docs/20-service-behavior.md",
   "docs/30-dto-contracts.md"
 ];
-
-const RELEVANT_FILE_PATTERNS = [
-  /\.java$/i,
-  /\.kt$/i,
-  /\.kts$/i,
-  /\.groovy$/i,
-  /\.xml$/i,
-  /\.ya?ml$/i,
-  /\.properties$/i,
-  /\.gradle$/i,
-  /(^|\/)pom\.xml$/i,
-  /(^|\/)build\.gradle(\.kts)?$/i,
-  /(^|\/)dockerfile$/i,
-  /(^|\/)helm\//i,
-  /(^|\/)k8s\//i
-];
-
-function looksLikeTestFile(file: string): boolean {
-  const lower = file.toLowerCase();
-  return lower.includes("/test/")
-    || lower.includes("\\test\\")
-    || lower.endsWith(".test.java")
-    || lower.endsWith("test.java")
-    || lower.endsWith(".spec.java")
-    || lower.endsWith(".test.ts")
-    || lower.endsWith(".spec.ts")
-    || lower.endsWith(".test.js")
-    || lower.endsWith(".spec.js");
-}
-
-function isRelevantFile(file: string): boolean {
-  const lower = file.toLowerCase();
-  if (lower.startsWith("docs/") || lower.endsWith(".md") || lower === "readme.md") {
-    return false;
-  }
-  if (looksLikeTestFile(file)) {
-    return false;
-  }
-  return RELEVANT_FILE_PATTERNS.some(pattern => pattern.test(file));
-}
 
 function actionTypeFor(input: PlanInput, file: string): DocActionType {
   if (file === "README.md") {
@@ -101,9 +67,85 @@ function addManagedAction(actions: DocAction[], input: PlanInput, spec: ManagedD
   });
 }
 
+function parseDiffContext(diff: string): Map<string, DiffContext> {
+  const byFile = new Map<string, DiffContext>();
+  let currentFile: string | null = null;
+
+  for (const line of diff.split("\n")) {
+    if (line.startsWith("+++ b/")) {
+      currentFile = line.slice("+++ b/".length).trim();
+      if (!byFile.has(currentFile)) {
+        byFile.set(currentFile, { added: 0, removed: 0, snippets: [] });
+      }
+      continue;
+    }
+    if (line.startsWith("+++ ") && !line.startsWith("+++ b/")) {
+      currentFile = null;
+      continue;
+    }
+    if (!currentFile) {
+      continue;
+    }
+
+    const entry = byFile.get(currentFile);
+    if (!entry) {
+      continue;
+    }
+
+    if (line.startsWith("+") && !line.startsWith("+++")) {
+      entry.added += 1;
+      const snippet = line.slice(1).trim();
+      if (snippet && entry.snippets.length < 2) {
+        entry.snippets.push(snippet.slice(0, 120));
+      }
+      continue;
+    }
+    if (line.startsWith("-") && !line.startsWith("---")) {
+      entry.removed += 1;
+    }
+  }
+
+  return byFile;
+}
+
+function inferImpactLines(files: string[]): string[] {
+  const impacts: string[] = [];
+  const lower = files.map(file => file.toLowerCase());
+
+  if (lower.some(file => [".html", ".css", ".scss", ".sass", ".js", ".jsx", ".ts", ".tsx", ".vue"].some(ext => file.endsWith(ext)))) {
+    impacts.push("Potential user-facing UI or frontend behavior changes.");
+  }
+  if (lower.some(file => [".java", ".kt", ".kts", ".groovy"].some(ext => file.endsWith(ext)))) {
+    impacts.push("Potential backend/business behavior or API changes.");
+  }
+  if (lower.some(file => file.endsWith(".md") || file.includes("/docs/") || file === "readme.md")) {
+    impacts.push("Documentation content or developer guidance changed.");
+  }
+  if (lower.some(file => [".yml", ".yaml", ".properties", ".env", "dockerfile"].some(token => file.endsWith(token) || file.includes(token)))) {
+    impacts.push("Potential runtime/deployment configuration impact.");
+  }
+  if (lower.some(file => ["package.json", "package-lock.json", "pom.xml", "build.gradle", "build.gradle.kts"].some(name => file.endsWith(name)))) {
+    impacts.push("Potential dependency or build pipeline impact.");
+  }
+
+  return impacts;
+}
+
 function evidenceLines(input: PlanInput, relevantFiles: string[]): string[] {
   const lines: string[] = [];
   lines.push(`Relevant files considered: ${relevantFiles.slice(0, 12).map(file => `\`${file}\``).join(", ")}${relevantFiles.length > 12 ? " ..." : ""}`);
+  const diffContext = parseDiffContext(input.diff);
+  const contextLines = relevantFiles.slice(0, 6).map(file => {
+    const ctx = diffContext.get(file);
+    if (!ctx) {
+      return `Context: \`${file}\` (change details unavailable in diff snippet).`;
+    }
+    const sample = ctx.snippets.length > 0 ? ` Sample: "${ctx.snippets[0]}"` : "";
+    return `Context: \`${file}\` (+${ctx.added}/-${ctx.removed}).${sample}`;
+  });
+  lines.push(...contextLines);
+  const impacts = inferImpactLines(relevantFiles);
+  lines.push(...impacts.map(impact => `Potential impact: ${impact}`));
   lines.push(...input.javaSignals.evidence);
   if (input.mode === "ai") {
     lines.push("AI mode requested: using guardrailed marker-only update mode.");
@@ -268,18 +310,10 @@ export function buildPlan(input: PlanInput): DocPlan {
     };
   }
 
-  if (input.changedFiles.length > 0 && input.changedFiles.every(looksLikeTestFile)) {
-    return {
-      actions: [{ type: "skip", file: "", reason: "Only test changes detected." }],
-      relevantFiles: [],
-      evidence: []
-    };
-  }
-
-  const relevantFiles = input.changedFiles.filter(isRelevantFile);
+  const relevantFiles = [...new Set(input.changedFiles)];
   if (relevantFiles.length === 0) {
     return {
-      actions: [{ type: "skip", file: "", reason: "No relevant source/config changes detected." }],
+      actions: [{ type: "skip", file: "", reason: "No changed files found." }],
       relevantFiles: [],
       evidence: []
     };
@@ -313,9 +347,9 @@ export function buildPlan(input: PlanInput): DocPlan {
   });
 
   const docsMissing = !input.docsExist.docsFolder;
-  const shouldUpdateApi = docsMissing || input.javaSignals.newEndpoints.length > 0 || input.javaSignals.endpointFiles.length > 0;
-  const shouldUpdateServices = docsMissing || input.javaSignals.serviceFiles.length > 0;
-  const shouldUpdateDtos = docsMissing || input.javaSignals.dtoFiles.length > 0;
+  const shouldUpdateApi = input.javaSignals.newEndpoints.length > 0 || input.javaSignals.endpointFiles.length > 0;
+  const shouldUpdateServices = input.javaSignals.serviceFiles.length > 0;
+  const shouldUpdateDtos = input.javaSignals.dtoFiles.length > 0;
   const shouldCreateGlossary = docsMissing || !input.docsExist.files["docs/01-glossary.md"];
 
   if (shouldUpdateApi) {
