@@ -15,7 +15,7 @@ export interface PlanInput {
   changedFiles: string[];
   diff: string;
   project: { buildTool: string; isSpringBoot: boolean };
-  docsExist: { readme: boolean; docsFolder: boolean; files: Record<string, boolean> };
+  docsExist: { readme: boolean; changelog: boolean; docsFolder: boolean; files: Record<string, boolean> };
   javaSignals: JavaChangeSignals;
   mode: "rules" | "ai";
 }
@@ -52,6 +52,9 @@ export const MANAGED_DOC_FILES: string[] = [
 function actionTypeFor(input: PlanInput, file: string): DocActionType {
   if (file === "README.md") {
     return input.docsExist.readme ? "update" : "create";
+  }
+  if (file === "CHANGELOG.md") {
+    return input.docsExist.changelog ? "update" : "create";
   }
   return input.docsExist.files[file] ? "update" : "create";
 }
@@ -131,6 +134,24 @@ function inferImpactLines(files: string[]): string[] {
   return impacts;
 }
 
+function hasConfigurationChange(files: string[]): boolean {
+  const lower = files.map(file => file.toLowerCase());
+  return lower.some(file => [
+    "package.json",
+    "package-lock.json",
+    "tsconfig.json",
+    "eslint.config.mjs",
+    ".env",
+    ".env.example",
+    "application.yml",
+    "application.yaml",
+    "application.properties",
+    "dockerfile",
+    "docker-compose.yml",
+    "docker-compose.yaml"
+  ].some(token => file.endsWith(token) || file.includes(token)));
+}
+
 function evidenceLines(input: PlanInput, relevantFiles: string[]): string[] {
   const lines: string[] = [];
   lines.push(`Relevant files considered: ${relevantFiles.slice(0, 12).map(file => `\`${file}\``).join(", ")}${relevantFiles.length > 12 ? " ..." : ""}`);
@@ -160,26 +181,32 @@ function formatEvidenceSection(input: PlanInput, relevantFiles: string[]): strin
   ];
 }
 
-function generateTechOverview(input: PlanInput, relevantFiles: string[]): string {
-  const runCmd = input.project.buildTool === "gradle"
-    ? "```bash\n./gradlew test\n./gradlew bootRun\n```"
-    : input.project.buildTool === "maven"
-      ? "```bash\nmvn test\nmvn spring-boot:run\n```"
-      : "```bash\n# add your build/run commands\n```";
-
+function generateConfigurationOverview(input: PlanInput, relevantFiles: string[]): string {
+  const configFiles = relevantFiles.filter(file => hasConfigurationChange([file]));
   return [
-    "### Technical Overview (auto-maintained)",
+    "### Configuration Notes (auto-maintained)",
     "",
     `- Build tool: **${input.project.buildTool}**`,
     `- Framework hint: **${input.project.isSpringBoot ? "Spring Boot" : "Java"}**`,
-    `- Relevant recent changes: ${relevantFiles.slice(0, 10).map(file => `\`${file}\``).join(", ")}${relevantFiles.length > 10 ? " ..." : ""}`,
-    "",
-    "#### How to run",
-    runCmd,
+    `- Config-related files touched: ${configFiles.length > 0 ? configFiles.map(file => `\`${file}\``).join(", ") : "None detected."}`,
     "",
     ...formatEvidenceSection(input, relevantFiles),
     "",
     "> This section is maintained by Docs Agent. Keep custom content outside markers."
+  ].join("\n");
+}
+
+function generateChangeLog(input: PlanInput, relevantFiles: string[]): string {
+  const topFiles = relevantFiles.slice(0, 15).map(file => `- \`${file}\``);
+  return [
+    "## Unreleased (auto-maintained)",
+    "",
+    "### Changed",
+    ...(topFiles.length > 0 ? topFiles : ["- No relevant files detected."]),
+    "",
+    ...formatEvidenceSection(input, relevantFiles),
+    "",
+    "> This section is maintained by Docs Agent."
   ].join("\n");
 }
 
@@ -321,14 +348,25 @@ export function buildPlan(input: PlanInput): DocPlan {
 
   const actions: DocAction[] = [];
   const evidence = evidenceLines(input, relevantFiles);
+  const configChanged = hasConfigurationChange(relevantFiles);
 
   addManagedAction(actions, input, {
-    file: "README.md",
-    title: "README",
-    reason: input.docsExist.readme ? "Update technical overview." : "Create README with technical overview markers.",
-    markers: { start: "<!-- DOCS_AGENT:TECH_OVERVIEW:START -->", end: "<!-- DOCS_AGENT:TECH_OVERVIEW:END -->" },
-    content: generateTechOverview(input, relevantFiles)
+    file: "CHANGELOG.md",
+    title: "Change Log",
+    reason: input.docsExist.changelog ? "Update changelog from code changes." : "Create changelog and track recent changes.",
+    markers: { start: "<!-- DOCS_AGENT:CHANGELOG:START -->", end: "<!-- DOCS_AGENT:CHANGELOG:END -->" },
+    content: generateChangeLog(input, relevantFiles)
   });
+
+  if (configChanged) {
+    addManagedAction(actions, input, {
+      file: "README.md",
+      title: "README",
+      reason: input.docsExist.readme ? "Update README configuration notes." : "Create README with configuration notes marker.",
+      markers: { start: "<!-- DOCS_AGENT:CONFIG:START -->", end: "<!-- DOCS_AGENT:CONFIG:END -->" },
+      content: generateConfigurationOverview(input, relevantFiles)
+    });
+  }
 
   addManagedAction(actions, input, {
     file: "docs/00-business-overview.md",

@@ -34,7 +34,8 @@ Docs Agent:
 
 ## Managed files
 
-- `README.md`
+- `CHANGELOG.md` (always managed)
+- `README.md` (managed only when configuration-related files change)
 - `docs/00-business-overview.md`
 - `docs/01-glossary.md`
 - `docs/10-architecture.md`

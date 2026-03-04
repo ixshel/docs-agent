@@ -28,7 +28,7 @@ test("buildPlan skips when no changed files exist", () => {
     changedFiles: [],
     diff: "",
     project: { buildTool: "unknown", isSpringBoot: false },
-    docsExist: { readme: true, docsFolder: true, files: docsMap(MANAGED_DOC_FILES) },
+    docsExist: { readme: true, changelog: true, docsFolder: true, files: docsMap(MANAGED_DOC_FILES) },
     javaSignals: baseSignals(),
     mode: "rules"
   });
@@ -42,7 +42,7 @@ test("buildPlan updates docs even for docs-only changes", () => {
     changedFiles: ["README.md", "docs/10-architecture.md"],
     diff: "mock diff",
     project: { buildTool: "maven", isSpringBoot: true },
-    docsExist: { readme: true, docsFolder: true, files: docsMap(MANAGED_DOC_FILES) },
+    docsExist: { readme: true, changelog: true, docsFolder: true, files: docsMap(MANAGED_DOC_FILES) },
     javaSignals: baseSignals(),
     mode: "rules"
   });
@@ -56,7 +56,7 @@ test("buildPlan updates docs for test-only file changes", () => {
     changedFiles: ["src/test/planner.spec.ts"],
     diff: "mock diff",
     project: { buildTool: "maven", isSpringBoot: true },
-    docsExist: { readme: true, docsFolder: true, files: docsMap(MANAGED_DOC_FILES) },
+    docsExist: { readme: true, changelog: true, docsFolder: true, files: docsMap(MANAGED_DOC_FILES) },
     javaSignals: baseSignals(),
     mode: "rules"
   });
@@ -70,7 +70,7 @@ test("buildPlan creates docs skeleton when docs folder is missing", () => {
     changedFiles: ["src/main/java/com/acme/service/UserService.java"],
     diff: "mock diff",
     project: { buildTool: "maven", isSpringBoot: true },
-    docsExist: { readme: false, docsFolder: false, files: docsMap([]) },
+    docsExist: { readme: false, changelog: false, docsFolder: false, files: docsMap([]) },
     javaSignals: baseSignals({
       javaFilesScanned: ["src/main/java/com/acme/service/UserService.java"],
       serviceFiles: ["src/main/java/com/acme/service/UserService.java"]
@@ -79,7 +79,8 @@ test("buildPlan creates docs skeleton when docs folder is missing", () => {
   });
 
   const files = plan.actions.map(action => action.file);
-  assert.equal(files.includes("README.md"), true);
+  assert.equal(files.includes("CHANGELOG.md"), true);
+  assert.equal(files.includes("README.md"), false);
   assert.equal(files.includes("docs/00-business-overview.md"), true);
   assert.equal(files.includes("docs/10-architecture.md"), true);
   assert.equal(files.includes("docs/11-api-endpoints.md"), false);
@@ -93,7 +94,7 @@ test("buildPlan updates endpoint doc when new endpoint annotations are detected"
     changedFiles: ["src/main/java/com/acme/controller/UserController.java"],
     diff: "mock diff",
     project: { buildTool: "gradle", isSpringBoot: true },
-    docsExist: { readme: true, docsFolder: true, files: docsMap(MANAGED_DOC_FILES) },
+    docsExist: { readme: true, changelog: true, docsFolder: true, files: docsMap(MANAGED_DOC_FILES) },
     javaSignals: baseSignals({
       javaFilesScanned: ["src/main/java/com/acme/controller/UserController.java"],
       endpointFiles: ["src/main/java/com/acme/controller/UserController.java"],
@@ -110,4 +111,19 @@ test("buildPlan updates endpoint doc when new endpoint annotations are detected"
 
   const files = plan.actions.map(action => action.file);
   assert.equal(files.includes("docs/11-api-endpoints.md"), true);
+});
+
+test("buildPlan includes README action when configuration files change", () => {
+  const plan = buildPlan({
+    changedFiles: ["package.json"],
+    diff: "mock diff",
+    project: { buildTool: "unknown", isSpringBoot: false },
+    docsExist: { readme: true, changelog: true, docsFolder: true, files: docsMap(MANAGED_DOC_FILES) },
+    javaSignals: baseSignals(),
+    mode: "rules"
+  });
+
+  const files = plan.actions.map(action => action.file);
+  assert.equal(files.includes("CHANGELOG.md"), true);
+  assert.equal(files.includes("README.md"), true);
 });

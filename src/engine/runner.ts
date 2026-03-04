@@ -40,6 +40,7 @@ export async function runDocsAgent(workspacePath: string, options: RunOptions = 
 
   const docsExist = {
     readme: exists(path.join(repoRoot, "README.md")),
+    changelog: exists(path.join(repoRoot, "CHANGELOG.md")),
     docsFolder: exists(path.join(repoRoot, "docs")),
     files: docFileMap
   };

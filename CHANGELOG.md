@@ -6,4 +6,6 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
-- Initial release
+- Switched Docs Agent updates from `README.md` to `CHANGELOG.md` as the default change target.
+- Limited README auto-updates to configuration-related changes only.
+- Updated README baseline content for SMS overview and core project details.
