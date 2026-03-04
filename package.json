@@ -4,7 +4,7 @@
   "displayName": "docs-agent",
   "description": "documentation agent",
   "icon": "media/icon.png",
-  "version": "0.0.3",
+  "version": "0.0.5",
   "license": "MIT",
   "funding": {
     "type": "github",
