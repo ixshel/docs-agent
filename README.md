@@ -1,15 +1,8 @@
-# Subscription Management System a.k.a SMS
+# docs-agent
 
-SMS houses and manages account information for ArcGIS Online (AGOL) monthly and annual subscriptions for organizations.
+`docs-agent` is a VS Code extension that proposes and applies documentation updates based on Git changes.
 
-SMS manages Esri online service accounts for:
-- organizations
-- BAO
-- CA
-- Maps products
-- ArcGIS Developers
-- ArcGIS Pro licenses
-- etc
+It previews doc patches first, then writes changes only after explicit confirmation.
 
 ## Technology and Framework
 
@@ -17,6 +10,8 @@ SMS manages Esri online service accounts for:
 - Language: TypeScript
 - Packaging: npm
 - Linting: ESLint
+- Bundling: esbuild
+- Host platform: VS Code extension API
 
 ## Tests
 
@@ -29,8 +24,9 @@ SMS manages Esri online service accounts for:
 - Source control: Git
 - Build output: `dist/` and `out/`
 - Documentation folder: `docs/`
+- Commands: `docsAgent.previewDocsUpdate`, `docsAgent.updateDocsFromChanges`
 
 ## Configuration
 
-- Main app config is defined in `package.json`.
-- Extension/runtime behavior may also use workspace settings where applicable.
+- Extension config is defined in `package.json`.
+- Workspace setting: `docsAgent.mode` (`rules` or `ai`).
