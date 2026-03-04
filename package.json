@@ -3,6 +3,14 @@
   "displayName": "docs-agent",
   "description": "documentation agent",
   "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ixshel/docs-agent.git"
+  },
+  "homepage": "https://github.com/ixshel/docs-agent#readme",
+  "bugs": {
+    "url": "https://github.com/ixshel/docs-agent/issues"
+  },
   "engines": {
     "vscode": "^1.109.0"
   },
